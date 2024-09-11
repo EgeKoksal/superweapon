@@ -28,7 +28,7 @@ class Player {
 class Projectile {
   constructor() {
     this.width = 8;
-    this.height = 40;
+    this.height = 25;
     this.x = 0;
     this.y = 0;
     this.speed = 10;
@@ -55,7 +55,70 @@ class Projectile {
   }
 }
 
-class Enemy {}
+class Enemy {
+  constructor(game, positionX, positionY) {
+    this.game = game;
+    this.width = this.game.enemySize;
+    this.height = this.game.enemySize;
+    this.x = 0;
+    this.y = 0;
+    this.positionX = positionX;
+    this.positionY = positionY;
+    this.markedForDeletion = false;
+  }
+  draw(context) {
+    context.strokeRect(this.x, this.y, this.width, this.height);
+  }
+  update(x, y) {
+    this.x = x + this.positionX;
+    this.y = y + this.positionY;
+    //check collision enemies - projectiles
+    this.game.projectilesPool.forEach((projectile) => {
+      if (!projectile.free && this.game.checkCollision(this, projectile)) {
+        this.markedForDeletion = true;
+        projectile.reset(); // Çarpışma sonrası mermiyi yeniden kullanılabilir hale getirir.
+      }
+    });
+  }
+}
+
+class Wave {
+  constructor(game) {
+    this.game = game;
+    this.width = this.game.columns * this.game.enemySize;
+    this.height = this.game.rows * this.game.enemySize;
+    this.x = 0;
+    this.y = -this.height;
+    this.speedX = 1; // bu 3 dü
+    this.speedY = 0;
+    this.enemies = [];
+    this.create();
+  }
+  render(context) {
+    if (this.y < 0) this.y += 3; // 5 Dİ
+    this.speedY = 0;
+    if (this.x < 0 || this.x > this.game.width - this.width) {
+      this.speedX *= -1;
+      this.speedY = this.game.enemySize;
+    }
+    this.x += this.speedX;
+    this.y += this.speedY;
+    this.enemies.forEach((enemy) => {
+      enemy.update(this.x, this.y);
+      enemy.draw(context);
+    });
+    this.enemies = this.enemies.filter((object) => !object.markedForDeletion);
+  }
+  create() {
+    for (let y = 0; y < this.game.rows; y++) {
+      for (let x = 0; x < this.game.columns; x++) {
+        let enemyX = x * this.game.enemySize;
+        let enemyY = y * this.game.enemySize;
+        this.enemies.push(new Enemy(this.game, enemyX, enemyY));
+      }
+    }
+  }
+}
 
 class Game {
   constructor(canvas) {
@@ -67,7 +130,13 @@ class Game {
     this.projectilesPool = [];
     this.NumberOfProjectiles = 10;
     this.createProjectiles();
-    console.log(this.projectilesPool);
+
+    this.columns = 3;
+    this.rows = 3;
+    this.enemySize = 60;
+
+    this.waves = [];
+    this.waves.push(new Wave(this));
 
     //eventlisteners burada
     window.addEventListener("keydown", (e) => {
@@ -79,12 +148,16 @@ class Game {
       if (index > -1) this.keys.splice(index, 1);
     });
   }
+
   render(context) {
     this.player.draw(context); // Oyuncu çiziliyor.
     this.player.update(); // Oyuncunun konumu güncelleniyor.
     this.projectilesPool.forEach((projectile) => {
       projectile.update();
       projectile.draw(context);
+    });
+    this.waves.forEach((wave) => {
+      wave.render(context);
     });
   }
 
@@ -100,13 +173,26 @@ class Game {
       if (this.projectilesPool[i].free) return this.projectilesPool[i];
     }
   }
+
+  //çarpışma testpit edici
+  checkCollision(a, b) {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
+    );
+  }
 }
 
 window.addEventListener("load", function () {
   const canvas = document.getElementById("canvas1");
-  const ctx = canvas.getContext("2d"); // 2D çizim bağlamı alınıyor.
+  const ctx = canvas.getContext("2d"); // 2D çizim bağlamı alınıyor.bunu almak zorundasın
   canvas.width = 600;
   canvas.height = 800;
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 5;
 
   const game = new Game(canvas); // Game sınıfından bir oyun oluşturuluyor.
 
