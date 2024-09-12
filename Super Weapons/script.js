@@ -40,17 +40,20 @@ class Projectile {
     this.speed = 10;
     this.free = true;
   }
+
   draw(context) {
     if (!this.free) {
       context.fillRect(this.x, this.y, this.width, this.height);
     }
   }
+
   update() {
     if (!this.free) {
       this.y -= this.speed;
       if (this.y < -this.height) this.reset();
     }
   }
+
   start(x, y) {
     this.x = x;
     this.y = y;
@@ -72,20 +75,39 @@ class Enemy {
     this.positionY = positionY;
     this.markedForDeletion = false;
   }
+
   draw(context) {
-    context.strokeRect(this.x, this.y, this.width, this.height);
+    //context.strokeRect(this.x, this.y, this.width, this.height);
+    context.drawImage(
+      this.image,
+      this.frameX * this.width,
+      this.frameY * this.height,
+      this.width,
+      this.height,
+      this.x,
+      this.y,
+      this.width,
+      this.height
+    ); // burası beni etkiledi
   }
+
   update(x, y) {
     this.x = x + this.positionX;
     this.y = y + this.positionY;
     //check collision enemies - projectiles
     this.game.projectilesPool.forEach((projectile) => {
-      if (!projectile.free && this.game.checkCollision(this, projectile)) {
-        this.markedForDeletion = true;
+      if (!projectile.free && this.game.checkCollision(this, projectile) && this.lives >0) {
+        this.hit(1);
         projectile.reset(); // Çarpışma sonrası mermiyi yeniden kullanılabilir hale getirir.
-        if (!this.game.gameOver) this.game.score++;
       }
     });
+    if (this.lives < 1) {
+      if (this.game.spriteUpdate) this.frameX++;
+      if (this.frameX > this.maxFrame) {
+        this.markedForDeletion = true;
+        if (!this.game.gameOver) this.game.score += this.maxLives;
+      }
+    }
     // düşman oyuncu çarpışması
     if (this.game.checkCollision(this, this.game.player)) {
       this.markedForDeletion = true;
@@ -99,6 +121,21 @@ class Enemy {
       this.markedForDeletion = true;
     }
   }
+  hit(damage) {
+    this.lives -= damage;
+  }
+}
+
+class Beetlemorph extends Enemy {
+  constructor(game, positionX, positionY) {
+    super(game, positionX, positionY);
+    this.image = document.getElementById("beetlemorph");
+    this.frameX = 0;
+    this.maxFrame = 2;
+    this.frameY = Math.floor(Math.random() * 4);
+    this.lives = 1;
+    this.maxLives = this.lives;
+  }
 }
 
 class Wave {
@@ -106,9 +143,9 @@ class Wave {
     this.game = game;
     this.width = this.game.columns * this.game.enemySize;
     this.height = this.game.rows * this.game.enemySize;
-    this.x = 0;
+    this.x = this.game.width * 0.5 - this.width * 0.5;
     this.y = -this.height;
-    this.speedX = 1; // bu 3 dü
+    this.speedX = Math.random() < 0.5 ? -0.4 : 0.4;
     this.speedY = 0;
     this.enemies = [];
     this.nextWaveTrigger = false;
@@ -134,7 +171,7 @@ class Wave {
       for (let x = 0; x < this.game.columns; x++) {
         let enemyX = x * this.game.enemySize;
         let enemyY = y * this.game.enemySize;
-        this.enemies.push(new Enemy(this.game, enemyX, enemyY));
+        this.enemies.push(new Beetlemorph(this.game, enemyX, enemyY));
       }
     }
   }
@@ -154,11 +191,15 @@ class Game {
 
     this.columns = 2;
     this.rows = 2;
-    this.enemySize = 60;
+    this.enemySize = 80;
 
     this.waves = [];
     this.waves.push(new Wave(this));
     this.waveCount = 1;
+
+    this.spriteUpdate = false;
+    this.spriteTimer = 0;
+    this.spriteInterval = 150;
 
     this.score = 0;
     this.gameOver = false;
@@ -168,8 +209,8 @@ class Game {
       if (e.key === "1" && !this.fired) this.player.shoot();
       this.fired = true;
       if (this.keys.indexOf(e.key) === -1) this.keys.push(e.key);
-   
-      if(e.key ==='r' && this.gameOver) this.restart();
+
+      if (e.key === "r" && this.gameOver) this.restart();
     });
     window.addEventListener("keyup", (e) => {
       this.fired = false;
@@ -178,7 +219,15 @@ class Game {
     });
   }
 
-  render(context) {
+  render(context, deltaTime) {
+    if (this.spriteTimer > this.spriteInterval) {
+      this.spriteUpdate = true;
+      this.spriteTimer = 0;
+    } else {
+      this.spriteUpdate = false;
+      this.spriteTimer += deltaTime;
+    }
+
     this.drawStatusText(context);
     this.player.draw(context); // Oyuncu çiziliyor.
     this.player.update(); // Oyuncunun konumu güncelleniyor.
@@ -263,7 +312,6 @@ class Game {
     this.waveCount = 1;
     this.score = 0;
     this.gameOver = false;
-
   }
 }
 
@@ -279,10 +327,14 @@ window.addEventListener("load", function () {
 
   const game = new Game(canvas); // Game sınıfından bir oyun oluşturuluyor.
 
-  function animate() {
+  let lastTime = 0;
+
+  function animate(timeStamp) {
+    const deltaTime = timeStamp - lastTime;
+    lastTime = timeStamp;
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Ekranı temizler (önceki çerçeveleri siler).
-    game.render(ctx); // Oyunu çizip, güncelleme yapar.
+    game.render(ctx, deltaTime); // Oyunu çizip, güncelleme yapar.
     requestAnimationFrame(animate); // Bir sonraki animasyon karesi için tekrar çağrılır.
   }
-  animate(); // Animasyon başlatılır.
+  animate(0); // Animasyon başlatılır.
 });
