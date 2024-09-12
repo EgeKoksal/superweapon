@@ -24,6 +24,11 @@ class Player {
     const projectile = this.game.getProjectile();
     if (projectile) projectile.start(this.x + this.width * 0.5, this.y);
   }
+  restart() {
+    this.x = this.game.width * 0.5 - this.width * 0.5;
+    this.y = this.game.height - this.height;
+    this.lives = 3;
+  }
 }
 
 class Projectile {
@@ -145,9 +150,10 @@ class Game {
     this.projectilesPool = [];
     this.NumberOfProjectiles = 10;
     this.createProjectiles();
+    this.fired = false;
 
-    this.columns = 5;
-    this.rows = 5;
+    this.columns = 2;
+    this.rows = 2;
     this.enemySize = 60;
 
     this.waves = [];
@@ -155,15 +161,18 @@ class Game {
     this.waveCount = 1;
 
     this.score = 0;
-
     this.gameOver = false;
 
     //eventlisteners burada
     window.addEventListener("keydown", (e) => {
+      if (e.key === "1" && !this.fired) this.player.shoot();
+      this.fired = true;
       if (this.keys.indexOf(e.key) === -1) this.keys.push(e.key);
-      if (e.key === "1") this.player.shoot();
+   
+      if(e.key ==='r' && this.gameOver) this.restart();
     });
     window.addEventListener("keyup", (e) => {
+      this.fired = false;
       const index = this.keys.indexOf(e.key);
       if (index > -1) this.keys.splice(index, 1);
     });
@@ -218,15 +227,19 @@ class Game {
     context.shadowColor = "black";
     context.fillText("Score: " + this.score, 20, 40);
     context.fillText("Wave: " + this.waveCount, 20, 80);
-    for ( let i = 0; i < this.player.lives; i++) {
-      context.fillRect(20 + 10 * i,100,5,20);
+    for (let i = 0; i < this.player.lives; i++) {
+      context.fillRect(20 + 10 * i, 100, 5, 20);
     }
     if (this.gameOver) {
       context.textAlign = "center";
       context.font = "100px Impact";
       context.fillText("Game Over!", this.width * 0.5, this.height * 0.5);
       context.font = "20px Impact";
-      context.fillText("Press R to restart!!", this.width * 0.5, this.height * 0.5+ 30);
+      context.fillText(
+        "Press R to restart!!",
+        this.width * 0.5,
+        this.height * 0.5 + 30
+      );
     }
     context.restore();
   }
@@ -240,6 +253,17 @@ class Game {
       this.rows++;
     }
     this.waves.push(new Wave(this));
+  }
+  restart() {
+    this.player.restart();
+    this.columns = 2;
+    this.rows = 2;
+    this.waves = [];
+    this.waves.push(new Wave(this));
+    this.waveCount = 1;
+    this.score = 0;
+    this.gameOver = false;
+
   }
 }
 
