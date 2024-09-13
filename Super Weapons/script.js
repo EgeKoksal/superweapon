@@ -1,20 +1,58 @@
 class Player {
   constructor(game) {
     this.game = game;
-    this.width = 100;
-    this.height = 100;
+    this.width = 140;
+    this.height = 110;
     this.x = this.game.width * 0.5 - this.width * 0.5; // oyun yazarken nesnelerin ekrandaki yeri genelde x ve y ile belirtilir.
     this.y = this.game.height - this.height;
     this.speed = 5;
     this.lives = 3;
+    this.maxLives = 12; // en fazla can 10 olabilir
+    this.image = document.getElementById("player");
+    this.jets_image = document.getElementById("jets");
+    this.frameX = 0;
+    this.jetsFrame = 1;
   }
   draw(context) {
-    context.fillRect(this.x, this.y, this.width, this.height);
+    if (this.game.keys.indexOf("1") > -1) {
+      this.frameX = 2; // ateş ederken hangi player görüntüsünü istediğini seçiyorsun 1 mi 2 mi 3 mü ben 2 aldım. silahlara göre bu animasyon değişebilir
+    } else {
+      this.frameX = 0;
+    }
+    context.drawImage(
+      this.jets_image,
+      this.jetsFrame * this.width,
+      0,
+      this.width,
+      this.height,
+      this.x,
+      this.y,
+      this.width,
+      this.height
+    );
+    context.drawImage(
+      this.image,
+      this.frameX * this.width,
+      0,
+      this.width,
+      this.height,
+      this.x,
+      this.y,
+      this.width,
+      this.height
+    );
   }
   update() {
     //yatay hareket
-    if (this.game.keys.indexOf("ArrowLeft") > -1) this.x -= this.speed;
-    if (this.game.keys.indexOf("ArrowRight") > -1) this.x += this.speed;
+    if (this.game.keys.indexOf("ArrowLeft") > -1) {
+    this.x -= this.speed;
+    this.jetsFrame = 0;
+  } else if (this.game.keys.indexOf("ArrowRight") > -1) {
+    this.x += this.speed;
+    this.jetsFrame = 2;
+  } else {
+    this.jetsFrame = 1;
+  }
     //yatay sınırlar
     if (this.x < -this.width * 0.5) this.x = -this.width * 0.5;
     else if (this.x > this.game.width - this.width * 0.5)
@@ -33,17 +71,20 @@ class Player {
 
 class Projectile {
   constructor() {
-    this.width = 8;
-    this.height = 25;
+    this.width = 4;
+    this.height = 35;
     this.x = 0;
     this.y = 0;
-    this.speed = 10;
-    this.free = true;
+    this.speed = 20;
+    this.free = false; // bu true idi, true yapınca aşağıdaki gold rengi çalışmıyor. ondan false yaptık
   }
 
   draw(context) {
     if (!this.free) {
+      context.save();
+      context.fillStyle = "gold";
       context.fillRect(this.x, this.y, this.width, this.height);
+      context.restore();
     }
   }
 
@@ -55,7 +96,7 @@ class Projectile {
   }
 
   start(x, y) {
-    this.x = x;
+    this.x = x - this.width * 0.5;
     this.y = y;
     this.free = false;
   }
@@ -96,7 +137,11 @@ class Enemy {
     this.y = y + this.positionY;
     //check collision enemies - projectiles
     this.game.projectilesPool.forEach((projectile) => {
-      if (!projectile.free && this.game.checkCollision(this, projectile) && this.lives >0) {
+      if (
+        !projectile.free &&
+        this.game.checkCollision(this, projectile) &&
+        this.lives > 0
+      ) {
         this.hit(1);
         projectile.reset(); // Çarpışma sonrası mermiyi yeniden kullanılabilir hale getirir.
       }
@@ -109,16 +154,14 @@ class Enemy {
       }
     }
     // düşman oyuncu çarpışması
-    if (this.game.checkCollision(this, this.game.player)) {
-      this.markedForDeletion = true;
-      if (!this.game.gameOver && this.game.score > 0) this.game.score--;
+    if (this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+      this.lives = 0;
       this.game.player.lives--;
-      if (this.game.player.lives < 1) this.game.gameOver = true;
+     
     }
     // düşman aşağı gelince oyun biter
-    if (this.y + this.height > this.game.height) {
+    if (this.y + this.height > this.game.height || this.game.player.lives < 1) {
       this.game.gameOver = true;
-      this.markedForDeletion = true;
     }
   }
   hit(damage) {
@@ -185,12 +228,12 @@ class Game {
     this.keys = [];
     this.player = new Player(this); // Player nesnesi oluşturuluyor ve oyuna ekleniyor.
     this.projectilesPool = [];
-    this.NumberOfProjectiles = 10;
+    this.NumberOfProjectiles = 15;
     this.createProjectiles();
     this.fired = false;
 
-    this.columns = 2;
-    this.rows = 2;
+    this.columns = 1;
+    this.rows = 1;
     this.enemySize = 80;
 
     this.waves = [];
@@ -199,7 +242,7 @@ class Game {
 
     this.spriteUpdate = false;
     this.spriteTimer = 0;
-    this.spriteInterval = 150;
+    this.spriteInterval = 200;
 
     this.score = 0;
     this.gameOver = false;
@@ -229,19 +272,19 @@ class Game {
     }
 
     this.drawStatusText(context);
-    this.player.draw(context); // Oyuncu çiziliyor.
-    this.player.update(); // Oyuncunun konumu güncelleniyor.
     this.projectilesPool.forEach((projectile) => {
       projectile.update();
       projectile.draw(context);
     });
+    this.player.draw(context); // Oyuncu çiziliyor.
+    this.player.update(); // Oyuncunun konumu güncelleniyor.
     this.waves.forEach((wave) => {
       wave.render(context);
       if (wave.enemies.length < 1 && !wave.nextWaveTrigger && !this.gameOver) {
         this.newWave();
         this.waveCount++;
         wave.nextWaveTrigger = true;
-        this.player.lives++;
+       if(this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
       }
     });
   }
@@ -276,8 +319,11 @@ class Game {
     context.shadowColor = "black";
     context.fillText("Score: " + this.score, 20, 40);
     context.fillText("Wave: " + this.waveCount, 20, 80);
+    for (let i = 0; i < this.player.maxLives; i++) {
+      context.strokeRect(20 + 20 * i, 100, 10, 15);
+    }
     for (let i = 0; i < this.player.lives; i++) {
-      context.fillRect(20 + 10 * i, 100, 5, 20);
+      context.fillRect(20 + 20 * i, 100, 10, 15);
     }
     if (this.gameOver) {
       context.textAlign = "center";
@@ -322,7 +368,7 @@ window.addEventListener("load", function () {
   canvas.height = 800;
   ctx.fillStyle = "white";
   ctx.strokeStyle = "white";
-  ctx.lineWidth = 5;
+  
   ctx.font = "30px Impact";
 
   const game = new Game(canvas); // Game sınıfından bir oyun oluşturuluyor.
