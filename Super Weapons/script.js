@@ -7,7 +7,7 @@ class Player {
     this.y = this.game.height - this.height;
     this.speed = 5;
     this.lives = 3;
-    this.maxLives = 12; // en fazla can 10 olabilir
+    this.maxLives = 10; // en fazla can 10 olabilir
     this.image = document.getElementById("player");
     this.jets_image = document.getElementById("jets");
     this.frameX = 0;
@@ -45,14 +45,14 @@ class Player {
   update() {
     //yatay hareket
     if (this.game.keys.indexOf("ArrowLeft") > -1) {
-    this.x -= this.speed;
-    this.jetsFrame = 0;
-  } else if (this.game.keys.indexOf("ArrowRight") > -1) {
-    this.x += this.speed;
-    this.jetsFrame = 2;
-  } else {
-    this.jetsFrame = 1;
-  }
+      this.x -= this.speed;
+      this.jetsFrame = 0;
+    } else if (this.game.keys.indexOf("ArrowRight") > -1) {
+      this.x += this.speed;
+      this.jetsFrame = 2;
+    } else {
+      this.jetsFrame = 1;
+    }
     //yatay sınırlar
     if (this.x < -this.width * 0.5) this.x = -this.width * 0.5;
     else if (this.x > this.game.width - this.width * 0.5)
@@ -157,7 +157,6 @@ class Enemy {
     if (this.game.checkCollision(this, this.game.player) && this.lives > 0) {
       this.lives = 0;
       this.game.player.lives--;
-     
     }
     // düşman aşağı gelince oyun biter
     if (this.y + this.height > this.game.height || this.game.player.lives < 1) {
@@ -178,6 +177,22 @@ class Beetlemorph extends Enemy {
     this.frameY = Math.floor(Math.random() * 4);
     this.lives = 1;
     this.maxLives = this.lives;
+  }
+}
+
+class Rhinomorph extends Enemy {
+  constructor(game, positionX, positionY) {
+    super(game, positionX, positionY);
+    this.image = document.getElementById("rhinomorph");
+    this.frameX = 0;
+    this.maxFrame = 5;
+    this.frameY = Math.floor(Math.random() * 4);
+    this.lives = 4;
+    this.maxLives = this.lives;
+  }
+  hit(damage) {
+    this.lives -= damage;
+    this.frameX = this.maxLives - Math.floor(this.lives);
   }
 }
 
@@ -214,7 +229,12 @@ class Wave {
       for (let x = 0; x < this.game.columns; x++) {
         let enemyX = x * this.game.enemySize;
         let enemyY = y * this.game.enemySize;
-        this.enemies.push(new Beetlemorph(this.game, enemyX, enemyY));
+        if (Math.random() < 0.6) {
+          this.enemies.push(new Rhinomorph(this.game, enemyX, enemyY));
+        } else {
+          this.enemies.push(new Beetlemorph(this.game, enemyX, enemyY));
+        }
+        
       }
     }
   }
@@ -284,7 +304,7 @@ class Game {
         this.newWave();
         this.waveCount++;
         wave.nextWaveTrigger = true;
-       if(this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
+        if (this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
       }
     });
   }
@@ -368,7 +388,7 @@ window.addEventListener("load", function () {
   canvas.height = 800;
   ctx.fillStyle = "white";
   ctx.strokeStyle = "white";
-  
+
   ctx.font = "30px Impact";
 
   const game = new Game(canvas); // Game sınıfından bir oyun oluşturuluyor.
