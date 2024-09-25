@@ -196,6 +196,94 @@ class Rhinomorph extends Enemy {
   }
 }
 
+class Boss {
+  constructor(game, bossLives) {
+    this.game = game;
+    this.width = 200;
+    this.height = 200;
+    this.x = this.game.width * 0.5 - this.width * 0.5;
+    this.y = -this.height;
+    this.speedX = Math.random() < 0.5 ? -0.5 : 0.5;
+    this.speedY = 0;
+    this.lives = bossLives;
+    this.maxLives = this.lives;
+    this.markedForDeletion = false;
+    this.image = document.getElementById("boss");
+    this.frameX = 0;
+    this.frameY = Math.floor(Math.random() * 4);
+    this.maxFrame = 11;
+  }
+
+  draw(context) {
+    context.drawImage(
+      this.image,
+      this.frameX * this.width,
+      this.frameY * this.height,
+      this.width,
+      this.height,
+      this.x,
+      this.y,
+      this.width,
+      this.height
+    );
+    if (this.lives > 0) {
+      context.save();
+      context.textAlign = "center";
+      context.shadowOffsetX = 3;
+      context.shadowOffsetY = 3;
+      context.shadowColor = "black";
+      context.fillStyle = "gold";
+      context.fillText(this.lives, this.x + this.width * 0.5, this.y + 50);
+      context.restore();
+    }
+  }
+  update() {
+    this.speedY = 0;
+    if (this.game.spriteUpdate && this.lives > 0) this.frameX = 0;
+    if (this.y < 0) this.y += 2;
+    if (this.x < 0 || this.x > this.game.width - this.width && this.lives > 0) {
+      this.speedX *= -1;
+      this.speedY = this.height * 0.5;
+    }
+    this.x += this.speedX;
+    this.y += this.speedY;
+
+    // mermi yeme olayı
+    this.game.projectilesPool.forEach((projectile) => {
+      if (
+        this.game.checkCollision(this, projectile) &&
+        !projectile.free &&
+        this.lives > 0 && this.y >= 0
+      ) {
+        this.hit(1);
+        projectile.reset();
+      }
+    });
+
+    if (this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+      this.game.gameOver = true;
+      this.lives = 0;
+    }
+    //boss ölünce
+    if (this.lives < 1 && this.game.spriteUpdate) {
+      this.frameX++;
+      if (this.frameX > this.maxFrame) {
+        this.markedForDeletion = true;
+        this.game.score += this.maxLives;
+        this.game.bossLives += 5;
+        if (!this.game.gameOver) this.game.newWave();
+      }
+    }
+
+    if (this.y + this.height > this.game.height) this.game.gameOver = true;
+  }
+
+  hit(damage) {
+    this.lives -= damage;
+    if (this.lives > 0) this.frameX = 1;
+  }
+}
+
 class Wave {
   constructor(game) {
     this.game = game;
@@ -207,6 +295,7 @@ class Wave {
     this.speedY = 0;
     this.enemies = [];
     this.nextWaveTrigger = false;
+    this.markedForDeletion = false;
     this.create();
   }
   render(context) {
@@ -223,18 +312,18 @@ class Wave {
       enemy.draw(context);
     });
     this.enemies = this.enemies.filter((object) => !object.markedForDeletion);
+    if (this.enemies.length <= 0) this.markedForDeletion = true;
   }
   create() {
     for (let y = 0; y < this.game.rows; y++) {
       for (let x = 0; x < this.game.columns; x++) {
         let enemyX = x * this.game.enemySize;
         let enemyY = y * this.game.enemySize;
-        if (Math.random() < 0.6) {
+        if (Math.random() < 0.3) {
           this.enemies.push(new Rhinomorph(this.game, enemyX, enemyY));
         } else {
           this.enemies.push(new Beetlemorph(this.game, enemyX, enemyY));
         }
-        
       }
     }
   }
@@ -257,7 +346,7 @@ class Game {
     this.enemySize = 80;
 
     this.waves = [];
-    this.waves.push(new Wave(this));
+
     this.waveCount = 1;
 
     this.spriteUpdate = false;
@@ -266,6 +355,10 @@ class Game {
 
     this.score = 0;
     this.gameOver = false;
+
+    this.bossArray = [];
+    this.bossLives = 10;
+    this.restart();
 
     //eventlisteners burada
     window.addEventListener("keydown", (e) => {
@@ -296,15 +389,21 @@ class Game {
       projectile.update();
       projectile.draw(context);
     });
+    this.bossArray.forEach((boss) => {
+      boss.draw(context);
+      boss.update();
+    });
+    this.bossArray = this.bossArray.filter(
+      (object) => !object.markedForDeletion
+    );
     this.player.draw(context); // Oyuncu çiziliyor.
     this.player.update(); // Oyuncunun konumu güncelleniyor.
     this.waves.forEach((wave) => {
       wave.render(context);
       if (wave.enemies.length < 1 && !wave.nextWaveTrigger && !this.gameOver) {
         this.newWave();
-        this.waveCount++;
         wave.nextWaveTrigger = true;
-        if (this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
+        
       }
     });
   }
@@ -359,22 +458,33 @@ class Game {
     context.restore();
   }
   newWave() {
-    if (
-      Math.random() < 0.5 &&
-      this.columns * this.enemySize < this.width * 0.8
-    ) {
-      this.columns++;
-    } else if (this.rows * this.enemySize < this.height * 0.6) {
-      this.rows++;
+    this.waveCount++;
+    if (this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
+    if (this.waveCount % 3 === 0) {
+      this.bossArray.push (new Boss(this, this.bossLives))
+    } else {
+      if (
+        Math.random() < 0.5 &&
+        this.columns * this.enemySize < this.width * 0.8
+      ) {
+        this.columns++;
+      } else if (this.rows * this.enemySize < this.height * 0.6) {
+        this.rows++;
+      }
+      this.waves.push(new Wave(this));
     }
-    this.waves.push(new Wave(this));
+
+    this.waves = this.waves.filter((object) => !object.markedForDeletion);
   }
   restart() {
     this.player.restart();
     this.columns = 2;
     this.rows = 2;
     this.waves = [];
+    this.bossArray = [];
+    this.bossLives = 10;
     this.waves.push(new Wave(this));
+    //this.bossArray.push(new Boss(this, this.bossLives));
     this.waveCount = 1;
     this.score = 0;
     this.gameOver = false;

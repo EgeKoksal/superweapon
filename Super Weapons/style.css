@@ -11,6 +11,6 @@ body{
     background-image: url(https://www.frankslaboratory.co.uk/downloads/125/background.png);
 }
 
-#beetlemorph, #rhinomorph, #player, #jets  {
+#beetlemorph, #rhinomorph, #boss, #player, #jets  {
     display: none;
 }
