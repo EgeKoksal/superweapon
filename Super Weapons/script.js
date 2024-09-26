@@ -360,7 +360,7 @@ class Boss {
       if (this.frameX > this.maxFrame) {
         this.markedForDeletion = true;
         this.game.score += this.maxLives;
-        this.game.bossLives += 13;
+        this.game.bossLives += 10;
         if (!this.game.gameOver) this.game.newWave();
       }
     }
