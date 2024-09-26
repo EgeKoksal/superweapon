@@ -1,3 +1,70 @@
+class Laser {
+  constructor(game) {
+    this.game = game;
+    this.x = 0;
+    this.y = 0;
+    this.height = this.game.height - 50;
+  }
+  render(context) {
+    this.x =
+      this.game.player.x + this.game.player.width * 0.5 - this.width * 0.5;
+    this.game.player.energy -= this.damage;
+    context.save();
+    context.fillStyle = "gold";
+    context.fillRect(this.x, this.y, this.width, this.height);
+    context.fillStyle = "white";
+    context.fillRect(
+      this.x + this.width * 0.3,
+      this.y,
+      this.width * 0.4,
+      this.height
+    );
+    context.restore();
+
+    if (this.game.spriteUpdate) {
+      this.game.waves.forEach((wave) => {
+        wave.enemies.forEach((enemy) => {
+          if (this.game.checkCollision(enemy, this)) {
+            enemy.hit(this.damage);
+          }
+        });
+      });
+
+      this.game.bossArray.forEach((boss) => {
+        if (this.game.checkCollision(boss, this) && boss.y >= 0) {
+          boss.hit(this.damage);
+        }
+      });
+    }
+  }
+}
+
+class SmallLaser extends Laser {
+  constructor(game) {
+    super(game);
+    this.width = 5;
+    this.damage = 0.3;
+  }
+  render(context) {
+    if( this.game.player.energy > 1 && !this.game.player.cooldown) {
+      super.render(context);
+    } 
+  }
+}
+
+class BigLaser extends Laser {
+  constructor(game) {
+    super(game);
+    this.width = 25;
+    this.damage = 0.7;
+  }
+  render(context) {
+    if( this.game.player.energy > 1 && !this.game.player.cooldown) {
+      super.render(context);
+    } 
+  }
+}
+
 class Player {
   constructor(game) {
     this.game = game;
@@ -12,10 +79,21 @@ class Player {
     this.jets_image = document.getElementById("jets");
     this.frameX = 0;
     this.jetsFrame = 1;
+    this.smallLaser = new SmallLaser(this.game);
+    this.bigLaser = new BigLaser(this.game);
+    this.energy = 50;
+    this.maxEnergy = 100;
+    this.cooldown = false;
   }
   draw(context) {
     if (this.game.keys.indexOf("1") > -1) {
-      this.frameX = 2; // ateş ederken hangi player görüntüsünü istediğini seçiyorsun 1 mi 2 mi 3 mü ben 2 aldım. silahlara göre bu animasyon değişebilir
+      this.frameX = 1; // ateş ederken hangi player görüntüsünü istediğini seçiyorsun 1 mi 2 mi 3 mü ben 2 aldım. silahlara göre bu animasyon değişebilir
+    } else if (this.game.keys.indexOf("2") > -1) {
+      this.frameX = 2;
+      this.smallLaser.render(context);
+    } else if (this.game.keys.indexOf("3") > -1) {
+      this.frameX = 3;
+      this.bigLaser.render(context);
     } else {
       this.frameX = 0;
     }
@@ -43,6 +121,10 @@ class Player {
     );
   }
   update() {
+    //emergy
+    if (this.energy < this.maxEnergy) this.energy += 0.08;
+    if (this.energy < 1) this.cooldown = true;
+    else if (this.energy > this.maxEnergy * 0.2) this.cooldown = false;
     //yatay hareket
     if (this.game.keys.indexOf("ArrowLeft") > -1) {
       this.x -= this.speed;
@@ -140,7 +222,7 @@ class Enemy {
       if (
         !projectile.free &&
         this.game.checkCollision(this, projectile) &&
-        this.lives > 0
+        this.lives >= 1
       ) {
         this.hit(1);
         projectile.reset(); // Çarpışma sonrası mermiyi yeniden kullanılabilir hale getirir.
@@ -154,7 +236,7 @@ class Enemy {
       }
     }
     // düşman oyuncu çarpışması
-    if (this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+    if (this.game.checkCollision(this, this.game.player) && this.lives >= 1) {
       this.lives = 0;
       this.game.player.lives--;
     }
@@ -226,22 +308,29 @@ class Boss {
       this.width,
       this.height
     );
-    if (this.lives > 0) {
+    if (this.lives >= 1) {
       context.save();
       context.textAlign = "center";
       context.shadowOffsetX = 3;
       context.shadowOffsetY = 3;
       context.shadowColor = "black";
       context.fillStyle = "gold";
-      context.fillText(this.lives, this.x + this.width * 0.5, this.y + 50);
+      context.fillText(
+        Math.floor(this.lives),
+        this.x + this.width * 0.5,
+        this.y + 50
+      );
       context.restore();
     }
   }
   update() {
     this.speedY = 0;
-    if (this.game.spriteUpdate && this.lives > 0) this.frameX = 0;
+    if (this.game.spriteUpdate && this.lives >= 1) this.frameX = 0;
     if (this.y < 0) this.y += 2;
-    if (this.x < 0 || this.x > this.game.width - this.width && this.lives > 0) {
+    if (
+      this.x < 0 ||
+      (this.x > this.game.width - this.width && this.lives >= 1)
+    ) {
       this.speedX *= -1;
       this.speedY = this.height * 0.5;
     }
@@ -253,14 +342,15 @@ class Boss {
       if (
         this.game.checkCollision(this, projectile) &&
         !projectile.free &&
-        this.lives > 0 && this.y >= 0
+        this.lives >= 1 &&
+        this.y >= 0
       ) {
         this.hit(1);
         projectile.reset();
       }
     });
 
-    if (this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+    if (this.game.checkCollision(this, this.game.player) && this.lives >= 1) {
       this.game.gameOver = true;
       this.lives = 0;
     }
@@ -270,7 +360,7 @@ class Boss {
       if (this.frameX > this.maxFrame) {
         this.markedForDeletion = true;
         this.game.score += this.maxLives;
-        this.game.bossLives += 5;
+        this.game.bossLives += 13;
         if (!this.game.gameOver) this.game.newWave();
       }
     }
@@ -280,7 +370,7 @@ class Boss {
 
   hit(damage) {
     this.lives -= damage;
-    if (this.lives > 0) this.frameX = 1;
+    if (this.lives >= 1) this.frameX = 1;
   }
 }
 
@@ -389,6 +479,8 @@ class Game {
       projectile.update();
       projectile.draw(context);
     });
+    this.player.draw(context); // Oyuncu çiziliyor.
+    this.player.update(); // Oyuncunun konumu güncelleniyor.
     this.bossArray.forEach((boss) => {
       boss.draw(context);
       boss.update();
@@ -396,14 +488,12 @@ class Game {
     this.bossArray = this.bossArray.filter(
       (object) => !object.markedForDeletion
     );
-    this.player.draw(context); // Oyuncu çiziliyor.
-    this.player.update(); // Oyuncunun konumu güncelleniyor.
+
     this.waves.forEach((wave) => {
       wave.render(context);
       if (wave.enemies.length < 1 && !wave.nextWaveTrigger && !this.gameOver) {
         this.newWave();
         wave.nextWaveTrigger = true;
-        
       }
     });
   }
@@ -444,6 +534,14 @@ class Game {
     for (let i = 0; i < this.player.lives; i++) {
       context.fillRect(20 + 20 * i, 100, 10, 15);
     }
+
+    // energy
+    context.save();
+    this.player.cooldown ? context.fillStyle ="red" : context.fillStyle = "gold"
+    for (let i = 0; i < this.player.energy; i++) {
+      context.fillRect(20 + 2 * i, 135, 2, 15);
+    }
+    context.restore();
     if (this.gameOver) {
       context.textAlign = "center";
       context.font = "100px Impact";
@@ -461,7 +559,7 @@ class Game {
     this.waveCount++;
     if (this.player.lives < this.player.maxLives) this.player.lives++; // maks canı geçemez kodu
     if (this.waveCount % 3 === 0) {
-      this.bossArray.push (new Boss(this, this.bossLives))
+      this.bossArray.push(new Boss(this, this.bossLives));
     } else {
       if (
         Math.random() < 0.5 &&
